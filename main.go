@@ -11,6 +11,8 @@ func main() {
 	http.HandleFunc("/file/upload/success", handler.UploadSuccess) // 上传成功路由
 	http.HandleFunc("/file/meta", handler.GetFileMetaHandler)
 	http.HandleFunc("/file/download", handler.DownloadHandler)
+	http.HandleFunc("/file/update", handler.UpdateFileMetaHandler)
+	http.HandleFunc("/file/delete", handler.DeleteFileHandler)
 	fmt.Println("Server started on http://localhost:8080/file/upload")
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {

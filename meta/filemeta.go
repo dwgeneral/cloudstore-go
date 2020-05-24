@@ -24,3 +24,8 @@ func UploadFileMeta(fmeta FileMeta) {
 func GetFileMeta(fsha1 string) FileMeta {
 	return fileMetas[fsha1]
 }
+
+// RemoveFileMeta 通过 Sha1 值删除文件的元信息对象
+func RemoveFileMeta(fsha1 string) {
+	delete(fileMetas, fsha1)
+}
