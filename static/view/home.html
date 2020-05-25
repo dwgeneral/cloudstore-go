@@ -106,7 +106,7 @@
         if (!body) {
           return;
         }
-        var data = body;
+        var data = JSON.parse(body);
         if (!data || data.length <= 0) {
           return;
         }
@@ -150,18 +150,17 @@
           cell.innerHTML = data[i].LastUpdated;
 
           cell = x.insertCell();
-          cell.innerHTML = downloadHtml.format(data[i].FileHash, queryParams()) + cdlFileHtml
-            .format(data[i].FileHash, queryParams()) +
-            renameFileHtml.format(data[i].FileHash, data[i].FileName, data[i].FileHash,
-              queryParams());
+          cell.innerHTML = '<button class="btn btn-success" ' +
+            'style="height:30px;margin:5px 0;"' +
+            'onClick = "downloadFile(\'http://localhost:8080/file/' +
+            'downloadurl?filehash=' + data[i].FileHash + '&' + queryParams() + '\')">下载</button>';
         }
       }
     });
   }
 
   function toUploadFile() {
-    // window.location.href = '/file/upload?' + queryParams();
-    window.location.href = "/static/view/upload.html";
+    window.location.href = '/file/upload?' + queryParams();
   }
 
   function downloadFile(durl) {

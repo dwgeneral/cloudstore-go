@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"cloudstore-go/db"
 	"cloudstore-go/meta"
 	"cloudstore-go/util"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -52,16 +54,15 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 		newFile.Seek(0, 0)
 		fileMeta.FileSha1 = util.FileSha1(newFile)
-		// meta.UploadFileMeta(fileMeta)
 		meta.UploadFileMetaDB(fileMeta)
-
-		http.Redirect(w, r, "/file/upload/success", http.StatusFound)
+		r.ParseForm()
+		username := r.Form.Get("username")
+		res := db.OnUserFileUploadFinished(username, fileMeta.FileSha1, fileMeta.FileName, fileMeta.FileSize)
+		if !res {
+			w.Write([]byte("update user file table failed"))
+		}
+		http.Redirect(w, r, "/static/view/home.html", http.StatusFound)
 	}
-}
-
-// UploadSuccess 上传成功
-func UploadSuccess(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "upload success!")
 }
 
 // GetFileMetaHandler 根据 form hash 获取文件元信息
@@ -75,6 +76,26 @@ func GetFileMetaHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data, err := json.Marshal(fmeta)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(data)
+}
+
+// FileQueryHandler : 查询批量的文件元信息
+func FileQueryHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+
+	limitCnt, _ := strconv.Atoi(r.Form.Get("limit"))
+	username := r.Form.Get("username")
+	userFiles, err := db.QueryUserFileMetas(username, limitCnt)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	data, err := json.Marshal(userFiles)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -141,4 +162,39 @@ func DeleteFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	meta.RemoveFileMeta(filesha1)
 	w.WriteHeader(http.StatusOK)
+}
+
+// TryFastUploadHandler : 尝试秒传接口
+func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	username := r.Form.Get("username")
+	filehash := r.Form.Get("filehash")
+	filename := r.Form.Get("filename")
+	filesize, _ := strconv.Atoi(r.Form.Get("filesize"))
+
+	fileMeta, err := meta.GetFileMetaDB(filehash)
+	if err != nil {
+		fmt.Println(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if fileMeta == (meta.FileMeta{}) {
+		resp := util.RespMsg{
+			Code: -1,
+			Msg:  "秒传失败，请访问普通上传接口",
+		}
+		w.Write(resp.JSONBytes())
+		return
+	}
+
+	res := db.OnUserFileUploadFinished(username, filehash, filename, int64(filesize))
+	if res {
+		resp := util.RespMsg{Code: 0, Msg: "秒传成功"}
+		w.Write(resp.JSONBytes())
+		return
+	} 
+	resp := util.RespMsg{Code: -2, Msg: "秒传失败，请稍后重试"}
+	w.Write(resp.JSONBytes())
+	return
 }

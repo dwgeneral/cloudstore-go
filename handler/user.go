@@ -43,21 +43,16 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 // SignInHandler 登陆处理
 func SignInHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		data, err := ioutil.ReadFile("./static/view/signin.html")
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Write(data)
+		http.Redirect(w, r, "/static/view/signin.html", http.StatusFound)
 		return
 	}
 
 	r.ParseForm()
 	username := r.Form.Get("username")
 	passwd := r.Form.Get("password")
-	fmt.Println("username: " + username)
-	fmt.Println("passwd: " + passwd)
+
 	encodePasswd := util.Sha1([]byte(passwd + salt))
+
 	pwdChecked := db.UserSignIn(username, encodePasswd)
 	if !pwdChecked {
 		w.Write([]byte("FAILED"))
@@ -79,10 +74,27 @@ func SignInHandler(w http.ResponseWriter, r *http.Request) {
 		}{
 			Location: "http://" + r.Host + "/static/view/home.html",
 			Username: username,
-			Token: token,
+			Token:    token,
 		},
 	}
 	w.Write(resp.JSONBytes())
+}
+
+// UserInfoHandler 查询用户信息
+func UserInfoHandler(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	username := r.Form.Get("username")
+	user, err := db.GetUserInfo(username)
+	if err != nil {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	res := util.RespMsg{
+		Code: 0,
+		Msg:  "ok",
+		Data: user,
+	}
+	w.Write(res.JSONBytes())
 }
 
 // GenToken 生成token
@@ -92,8 +104,8 @@ func GenToken(username string) string {
 	return prefix + timestamp[:8]
 }
 
-// isTokenValid 校验Token
-func isTokenValid(token string) bool {
+// IsTokenValid 校验Token
+func IsTokenValid(token string) bool {
 	if len(token) != 40 {
 		return false
 	}
