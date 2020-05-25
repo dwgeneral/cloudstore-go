@@ -3,6 +3,7 @@ package handler
 import (
 	"cloudstore-go/db"
 	"cloudstore-go/meta"
+	"cloudstore-go/store/oss"
 	"cloudstore-go/util"
 	"encoding/json"
 	"fmt"
@@ -54,6 +55,17 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 		newFile.Seek(0, 0)
 		fileMeta.FileSha1 = util.FileSha1(newFile)
+
+		newFile.Seek(0, 0)
+		ossPath := "oss/" + fileMeta.FileSha1
+		err = oss.Bucket().PutObject(ossPath, newFile)
+		if err != nil {
+			fmt.Println(err.Error())
+			w.Write([]byte("Upload failed!"))
+			return
+		}
+		fileMeta.FilePath = ossPath
+
 		meta.UploadFileMetaDB(fileMeta)
 		r.ParseForm()
 		username := r.Form.Get("username")
@@ -193,7 +205,7 @@ func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
 		resp := util.RespMsg{Code: 0, Msg: "秒传成功"}
 		w.Write(resp.JSONBytes())
 		return
-	} 
+	}
 	resp := util.RespMsg{Code: -2, Msg: "秒传失败，请稍后重试"}
 	w.Write(resp.JSONBytes())
 	return

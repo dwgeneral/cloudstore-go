@@ -1,3 +1,4 @@
 tmp/*
 mysql/db/*
 mysql/db_slave/*
+config/*
