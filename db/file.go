@@ -15,7 +15,7 @@ type TableFile struct {
 
 // OnFileUploadFinished 文件上传完成持久化到数据库
 func OnFileUploadFinished(filehash string, filename string, filesize int64, fileaddr string) bool {
-	statement, err := mydb.DBConn().Prepare("insert ignore into tbl_file(`file_sha1`, `file_name`, `file_size`, `file_addr`, `status` values(?,?,?,?,1)")
+	statement, err := mydb.DBConn().Prepare("insert ignore into tbl_file(`file_sha1`, `file_name`, `file_size`, `file_addr`, `status`) values(?,?,?,?,1)")
 	if err != nil {
 		fmt.Printf("Failed to prepare statement, err: %s\n", err.Error())
 		return false
