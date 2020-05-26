@@ -66,6 +66,36 @@ $ docker run -d --hostname rabbit-server --name rabbit -p 5672:5672 -p 15672:156
 ```
 - 启动完成后，你可以登陆到 http://localhost:15672 尝试添加 exchange，queue，publish message, get message 体验一下 RabbitMQ 基本的消息流转逻辑, 如果遇到问题，请参考：https://www.rabbitmq.com/getstarted.html 官方文档
 
+#### 微服务架构迁移
+- API网关
+  - 将用户的HTTPS请求更换为微服务内部通信协议
+  - 限流、熔断等功能
+
+- 配置中心
+
+- 服务发现(服务注册中心) Consul
+  - 提供服务发现功能
+
+- 用户账户服务 UserService
+  - 提供用户登陆、注册功能
+
+- 文件下载服务 DownloadService
+  - 与上传服务分开，解耦，高并发时相互之间不再产生影响
+
+- 文件上传服务 UploadService
+  - 文件直传功能
+  - 大文件分片上传 / 秒传 / 断点续传 功能
+
+- 文件转移服务 TransferService
+  - 将上传的文件异步发送给OSS云存储
+
+- 消息队列 RabbitMQ
+
+- DBProxy
+  - 将数据层抽象，与具体的数据库实现解耦
+  - MySQL
+  - Redis
+
 #### 项目清单
 - 功能列表
   - 文件上传服务
@@ -73,6 +103,7 @@ $ docker run -d --hostname rabbit-server --name rabbit -p 5672:5672 -p 15672:156
     - 秒传功能 / 断点续传
   - 文件转移服务
     - Go结合RabbitMQ消息队列实现文件异步存储到OSS
+  - 账号系统
 
 - 技术栈列表
   - Go
