@@ -1,6 +1,9 @@
 package handler
 
 import (
+	common "cloudstore-go/common"
+	cfg "cloudstore-go/config"
+	"cloudstore-go/mq"
 	"cloudstore-go/db"
 	"cloudstore-go/meta"
 	"cloudstore-go/store/oss"
@@ -58,14 +61,38 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		fileMeta.FileSha1 = util.FileSha1(newFile)
 
 		newFile.Seek(0, 0)
-		ossPath := "oss/" + fileMeta.FileSha1
-		err = oss.Bucket().PutObject(ossPath, newFile)
-		if err != nil {
-			fmt.Println(err.Error())
-			w.Write([]byte("Upload failed!"))
-			return
+
+		if cfg.CurrentStoreType == common.StoreOSS {
+			ossPath := "oss/" + fileMeta.FileSha1
+			// 判断写入OSS为同步还是异步
+			if !cfg.AsyncTransferEnable {
+				err = oss.Bucket().PutObject(ossPath, newFile)
+				if err != nil {
+					fmt.Println(err.Error())
+					w.Write([]byte("Upload failed!"))
+					return
+				}
+				fileMeta.FilePath = ossPath
+			} else {
+				fmt.Println("写入异步任务队列中。。。。。。。。")
+				// 写入异步转移任务队列
+				data := mq.TransferData{
+					FileHash:      fileMeta.FileSha1,
+					CurLocation:   fileMeta.FilePath,
+					DestLocation:  ossPath,
+					DestStoreType: common.StoreOSS,
+				}
+				pubData, _ := json.Marshal(data)
+				pubSuc := mq.Publish(
+					cfg.TransExchangeName,
+					cfg.TransOSSRoutingKey,
+					pubData,
+				)
+				if !pubSuc {
+					// TODO: 当前发送转移信息失败，稍后重试
+				}
+			}
 		}
-		fileMeta.FilePath = ossPath
 
 		meta.UploadFileMetaDB(fileMeta)
 		r.ParseForm()

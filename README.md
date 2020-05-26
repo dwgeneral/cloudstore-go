@@ -57,7 +57,14 @@ Slave_SQL_Running: Yes
   - 比手动拼接字符串更有效
   - 方便实现自定义参数查询
 
-#### RabbitMQ 
+#### docker 启动 RabbitMQ 服务
+- 创建数据卷挂载目录 ./db/rabbitmq/
+- 通过 docker 启动 rabbitmq 服务，默认 5672 为 rabbitmq 服务端口，15672 为Web管理界面端口，25672 为集群间节点通信端口 
+- RabbitMQ Web 管理后台默认用户名及密码都为 guest
+```shell
+$ docker run -d --hostname rabbit-server --name rabbit -p 5672:5672 -p 15672:15672 -p 25672:25672 -v ~/go/src/cloudstore-go/db/rabbitmq:/var/lib/rabbitmq rabbitmq:management
+```
+- 启动完成后，你可以登陆到 http://localhost:15672 尝试添加 exchange，queue，publish message, get message 体验一下 RabbitMQ 基本的消息流转逻辑, 如果遇到问题，请参考：https://www.rabbitmq.com/getstarted.html 官方文档
 
 - 功能列表
   - 文件上传

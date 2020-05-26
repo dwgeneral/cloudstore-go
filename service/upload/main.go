@@ -27,7 +27,7 @@ func main() {
 	http.HandleFunc("/user/signin", handler.SignInHandler)
 	http.HandleFunc("/user/info", handler.HTTPInterceptor(handler.UserInfoHandler))
 
-	fmt.Println("Server started on http://localhost:8080/user/signin")
+	fmt.Println("upload service started on http://localhost:8080")
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		fmt.Printf("Failed to start server: %s", err.Error())
