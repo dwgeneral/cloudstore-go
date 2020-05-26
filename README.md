@@ -66,12 +66,13 @@ $ docker run -d --hostname rabbit-server --name rabbit -p 5672:5672 -p 15672:156
 ```
 - 启动完成后，你可以登陆到 http://localhost:15672 尝试添加 exchange，queue，publish message, get message 体验一下 RabbitMQ 基本的消息流转逻辑, 如果遇到问题，请参考：https://www.rabbitmq.com/getstarted.html 官方文档
 
+#### 项目清单
 - 功能列表
-  - 文件上传
-  - 文件下载
-  - 秒传功能 / 断点续传
-  - OSS云存储
-  - 异步任务队列处理
+  - 文件上传服务
+    - 文件下载
+    - 秒传功能 / 断点续传
+  - 文件转移服务
+    - Go结合RabbitMQ消息队列实现文件异步存储到OSS
 
 - 技术栈列表
   - Go
