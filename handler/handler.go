@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -209,4 +210,22 @@ func TryFastUploadHandler(w http.ResponseWriter, r *http.Request) {
 	resp := util.RespMsg{Code: -2, Msg: "秒传失败，请稍后重试"}
 	w.Write(resp.JSONBytes())
 	return
+}
+
+// DownloadURLHandler : 生成文件的下载地址
+func DownloadURLHandler(w http.ResponseWriter, r *http.Request) {
+	filehash := r.Form.Get("filehash")
+	// 从文件表查找记录
+	row, _ := db.GetFileMeta(filehash)
+
+	if strings.HasPrefix(row.FileAddr.String, "/tmp") {
+		username := r.Form.Get("username")
+		token := r.Form.Get("token")
+		tmpURL := fmt.Sprintf("http://%s/file/download?filehash=%s&username=%s&token=%s",
+			r.Host, filehash, username, token)
+		w.Write([]byte(tmpURL))
+	} else if strings.HasPrefix(row.FileAddr.String, "oss/") {
+		signedURL := oss.DownloadURL(row.FileAddr.String)
+		w.Write([]byte(signedURL))
+	}
 }

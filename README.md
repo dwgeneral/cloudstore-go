@@ -56,3 +56,23 @@ Slave_SQL_Running: Yes
   - 防止SQL注入攻击
   - 比手动拼接字符串更有效
   - 方便实现自定义参数查询
+
+#### RabbitMQ 
+
+- 功能列表
+  - 文件上传
+  - 文件下载
+  - 秒传功能 / 断点续传
+  - OSS云存储
+  - 异步任务队列处理
+
+- 技术栈列表
+  - Go
+  - Gin
+  - MySQL
+  - Redis
+  - Docker
+  - RabbitMQ
+  - go-micro
+  - gPRC
+  - Kubernetes
