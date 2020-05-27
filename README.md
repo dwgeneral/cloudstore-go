@@ -66,6 +66,12 @@ $ docker run -d --hostname rabbit-server --name rabbit -p 5672:5672 -p 15672:156
 ```
 - 启动完成后，你可以登陆到 http://localhost:15672 尝试添加 exchange，queue，publish message, get message 体验一下 RabbitMQ 基本的消息流转逻辑, 如果遇到问题，请参考：https://www.rabbitmq.com/getstarted.html 官方文档
 
+
+#### 安装 go-micro、Protobuf、consul、grpc 等工具集
+- 安装教程参考：https://studygolang.com/articles/16832
+
+- 访问服务发现Consul管理后台 http://localhost:8500
+
 #### 微服务架构迁移
 - API网关
   - 将用户的HTTPS请求更换为微服务内部通信协议

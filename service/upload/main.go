@@ -1,34 +1,79 @@
 package main
 
 import (
-	"cloudstore-go/handler"
+	"cloudstore-go/config"
+	"cloudstore-go/mq"
 	"fmt"
-	"net/http"
+	"log"
+	"os"
+	"time"
+
+	"github.com/micro/cli"
+	micro "github.com/micro/go-micro"
+	_ "github.com/micro/go-plugins/registry/kubernetes"
+
+	"cloudstore-go/common"
+	dbproxy "cloudstore-go/service/dbproxy/client"
+	cfg "cloudstore-go/service/upload/config"
+	upProto "cloudstore-go/service/upload/proto"
+	"cloudstore-go/service/upload/route"
+	upRpc "cloudstore-go/service/upload/rpc"
 )
 
-func main() {
-	// 处理静态资源映射
-	http.Handle("/static/", http.StripPrefix("/static", http.FileServer(http.Dir("./static"))))
+func startRPCService() {
+	service := micro.NewService(
+		micro.Name("go.micro.service.upload"), // 服务名称
+		micro.RegisterTTL(time.Second*10),     // TTL指定从上一次心跳间隔起，超过这个时间服务会被服务发现移除
+		micro.RegisterInterval(time.Second*5), // 让服务在指定时间内重新注册，保持TTL获取的注册时间有效
+		micro.Flags(common.CustomFlags...),
+	)
+	service.Init(
+		micro.Action(func(c *cli.Context) {
+			// 检查是否指定mqhost
+			mqhost := c.String("mqhost")
+			if len(mqhost) > 0 {
+				log.Println("custom mq address: " + mqhost)
+				mq.UpdateRabbitHost(mqhost)
+			}
+		}),
+	)
 
-	http.HandleFunc("/file/upload", handler.HTTPInterceptor(handler.UploadHandler)) // 创建上传路由
-	http.HandleFunc("/file/meta", handler.HTTPInterceptor(handler.GetFileMetaHandler))
-	http.HandleFunc("/file/query", handler.HTTPInterceptor(handler.FileQueryHandler))
-	http.HandleFunc("/file/download", handler.HTTPInterceptor(handler.DownloadHandler))
-	http.HandleFunc("/file/update", handler.HTTPInterceptor(handler.UpdateFileMetaHandler))
-	http.HandleFunc("/file/delete", handler.HTTPInterceptor(handler.DeleteFileHandler))
-	http.HandleFunc("/file/fastupload", handler.HTTPInterceptor(handler.TryFastUploadHandler))
-	http.HandleFunc("/file/downloadurl", handler.HTTPInterceptor(handler.DownloadURLHandler))
+	// 初始化dbproxy client
+	dbproxy.Init(service)
+	// 初始化mq client
+	mq.Init()
 
-	http.HandleFunc("/file/mpupload/init", handler.HTTPInterceptor(handler.InitialMultipartUploadHandler))
-	http.HandleFunc("/file/mpupload/uppart", handler.HTTPInterceptor(handler.UploadPartHandler))
-	http.HandleFunc("/file/mpupload/complete", handler.HTTPInterceptor(handler.CompleteUploadHandler))
-
-	
-	http.HandleFunc("/user/info", handler.HTTPInterceptor(handler.UserInfoHandler))
-
-	fmt.Println("upload service started on http://localhost:8080")
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		fmt.Printf("Failed to start server: %s", err.Error())
+	upProto.RegisterUploadServiceHandler(service.Server(), new(upRpc.Upload))
+	if err := service.Run(); err != nil {
+		fmt.Println(err)
 	}
+}
+
+func startAPIService() {
+	router := route.Router()
+	router.Run(cfg.UploadServiceHost)
+	// service := web.NewService(
+	// 	web.Name("go.micro.web.upload"),
+	// 	web.Handler(router),
+	// 	web.RegisterTTL(10*time.Second),
+	// 	web.RegisterInterval(5*time.Second),
+	// )
+	// if err := service.Init(); err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// if err := service.Run(); err != nil {
+	// 	log.Fatal(err)
+	// }
+}
+
+func main() {
+	os.MkdirAll(config.TempLocalRootDir, 0777)
+	os.MkdirAll(config.TempPartRootDir, 0777)
+
+	// api 服务
+	go startAPIService()
+
+	// rpc 服务
+	startRPCService()
 }
