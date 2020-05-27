@@ -1,123 +1,81 @@
 # cloudstore-go
 基于 Golang 的分布式云存储服务
 
-#### docker 启动 mysql 主从
-- 创建 mysql 文件夹，建立 master & slave 配置文件
-- 通过 docker 启动两个 mysql 实例，一个作为 master，一个作为 slave
-```shell
-$ vi mysql/master.conf
-$ vi mysql/slave.conf
+## 项目介绍
 
-$ docker pull mysql:5.7
+本项目的构建初衷是想开发一个私密的家庭相册产品，随着对项目的梳理，感觉自己应该先做一个云存储项目，于是有了本项目的初步规划。在立项，技术选型时，本着边学边练的精神，将自己感兴趣而没有实践过的技术运用一下，岂不美哉。于是选择了Golang，MySQL（对，你没看错，我工作用的是MongoDB），gRPC 等技术栈。
 
-$ docker run -d --name mysql-master -p 13306:3306 -v ~/go/src/cloudstore-go/mysql/master.conf:/etc/mysql/mysql.conf.d/mysqld.cnf -v ~/go/src/cloudstore-go/mysql/db:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=123456 mysql:5.7
+该项目计划实现的功能是：
 
-$ docker run -d --name mysql-slave -p 13307:3306 -v ~/go/src/cloudstore-go/mysql/slave.conf:/etc/mysql/mysql.conf.d/mysqld.cnf -v ~/go/src/cloudstore-go/mysql/db_slave:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=123456 mysql:5.7
-```
+- 账号体系
+  - 用户需要注册、登陆，才能上传文件
+  - 用户只能看到自己上传的文件
 
-- 登陆 Master 节点，进行主从配置
-```shell
-# 192.168.123.xx 是你本机的内网ip (ifconfig查看)
-$ mysql -u root -h 192.168.123.xx -P13306 -p123456
-mysql> GRANT REPLICATION SLAVE ON *.* TO 'slave'@'%' IDENTIFIED BY 'slave';
-mysql> flush privileges;
-mysql> create database cloudstore default character set utf8mb4;
-mysql> show master status \G;
-*************************** 1. row ***************************
-             File: log.000003
-         Position: 1313
-     Binlog_Do_DB:
- Binlog_Ignore_DB:
-Executed_Gtid_Set:
-```
+- 文件上传服务
+  - 用户可以自由上传文件，小文件，大文件均可
+  - 用户上传文件的流程应该是顺滑的，大文件需要分片上传，断电续传
+  - 用户上传一份已经在云端的文件，应该要做到秒传，无论这个文件是谁传上来的
+  - 用户上传的文件不能随意丢失，需要连接到云端OSS服务
 
-- 登陆 Slave 节点，进行主从配置
-```shell
-$ mysql -u root -h 192.168.123.xx -P13307 -p123456
-mysql> stop slave;
-# 注意其中的日志文件和数值要和上面show master status的值对应
-mysql> CHANGE MASTER TO MASTER_HOST='your ip',master_port=13306,MASTER_USER='slave',MASTER_PASSWORD='slave',MASTER_LOG_FILE='log.log.000003',MASTER_LOG_POS=0;
-mysql> start slave;
-mysql> show slave status G;
-// ...
-Slave_IO_Running: Yes 
-Slave_SQL_Running: Yes 
-// ...
-```
-- 配置完成，此时在 master 节点的数据与 slave 节点的数据会通过binlog进行同步
+- 文件下载服务
+  - 用户可以下载自己传过的文件
 
-#### 使用 MySQL 技术概览
-- 通过 sql.DB 来管理数据库连接对象
-- 通过 sql.Open 来创建协程安全的 sql.DB 对象
-  - 一般来说这个对象是作为长连接来使用的
-  - 我们不需要频繁的调用 Open / Close 方法
-  - 减少资源消耗和服务器压力
-- 优先使用 Prepared Statement
-  - 防止SQL注入攻击
-  - 比手动拼接字符串更有效
-  - 方便实现自定义参数查询
+- 待完善
 
-#### docker 启动 RabbitMQ 服务
-- 创建数据卷挂载目录 ./db/rabbitmq/
-- 通过 docker 启动 rabbitmq 服务，默认 5672 为 rabbitmq 服务端口，15672 为Web管理界面端口，25672 为集群间节点通信端口 
-- RabbitMQ Web 管理后台默认用户名及密码都为 guest
-```shell
-$ docker run -d --hostname rabbit-server --name rabbit -p 5672:5672 -p 15672:15672 -p 25672:25672 -v ~/go/src/cloudstore-go/db/rabbitmq:/var/lib/rabbitmq rabbitmq:management
-```
-- 启动完成后，你可以登陆到 http://localhost:15672 尝试添加 exchange，queue，publish message, get message 体验一下 RabbitMQ 基本的消息流转逻辑, 如果遇到问题，请参考：https://www.rabbitmq.com/getstarted.html 官方文档
+## 技术栈介绍
 
+- Gin
+  - 基于 Golang 的一个 Web 应用框架
+  - 底层是基于 Go 的 net/http 包
+  - 更好的性能和更快的路由
+  - 编程体验优秀。只需要引入包、定义路由、编写Handler即可开发应用
+  - 简单，理解了核心结构 gin.Context 即可使用 Gin 流畅编程
+  - 简洁，没有提供 ORM，CONFIG 等组件，把选择权留给开发者
 
-#### 安装 go-micro、Protobuf、consul、grpc 等工具集
-- 安装教程参考：https://studygolang.com/articles/16832
+- MySQL
+  - 使用 MySQL 作为持久化数据库
+  - 主要存储用户账户信息，用户文件关系，文件元信息等数据
 
-- 访问服务发现Consul管理后台 http://localhost:8500
+- Redis
+  - 使用 Redis 作为缓存数据库
+  - 主要缓存在分片上传大文件时的状态信息 uploadID, chunkID, index, filesize 等
 
-#### 微服务架构迁移
-- API网关
-  - 将用户的HTTPS请求更换为微服务内部通信协议
-  - 限流、熔断等功能
+- RabbitMQ
+  - 使用 RabbitMQ 作为消息队列
+  - 将文件异步存储至OSS
 
-- 配置中心
+- go-micro
+  - 基于 Golang 的一个插件式微服务框架
+  - 提供服务发现、负载均衡、同步/异步通信、服务接口等，所有组件均为 Interface，便于扩展
+  - 服务间传输数据格式为 protobuf，效率高，安全
+  - 主要组件
+    - Registry 
+      - 服务发现、发现、注销、监测机制
+      - 服务注册中心支持 consul、etcd、zookeeper、gossip、k8s、eureka等
+    - Select
+      - 选择器提供了负载均衡，可以通过过滤方法对微服务进行过滤，并通过不同路由算法选择微服务，以及缓存等
+    - Transport
+      - 微服务间同步请求/响应通信方式，相对Go标准net包做了更高的抽象，支持更多的传输方式，如http、grpc、tcp、udp、Rabbitmq等
+    - Broker
+      - 微服务间异步发布/订阅通信方式，更好的处理分布式系统解耦问题，默认使用http方式，生产环境通常会使用消息中间件，如Kafka、RabbitMQ、NSQ等
+    - Codec
+      - 服务间消息的编解码，支持json、protobuf、bson、msgpack等，与普通编码格式不同都是支持RPC格式
+    - Server
+      - 用于启动服务，为服务命名、注册Handler、添加中间件等
+    - Client
+      - 提供微服务客户端，通过Registry、Selector、Transport、Broker实现以服务名来查找服务、负载均衡、同步通信、异步消息等
 
-- 服务发现(服务注册中心) Consul
-  - 提供服务发现功能
+- Docker
+  - 容器化是必须的
 
-- 用户账户服务 UserService
-  - 提供用户登陆、注册功能
+- Kubernetes
+  - 既上次搭建完K8S集群后，好久没接触过了，这次重新熟悉一下
 
-- 文件下载服务 DownloadService
-  - 与上传服务分开，解耦，高并发时相互之间不再产生影响
+- Istio (TODO)
+  - Service Mesh 据说好像很不错
 
-- 文件上传服务 UploadService
-  - 文件直传功能
-  - 大文件分片上传 / 秒传 / 断点续传 功能
+- Kafka (TODO)
+  - 如果未来有日志处理需求了的话，可以考虑
 
-- 文件转移服务 TransferService
-  - 将上传的文件异步发送给OSS云存储
-
-- 消息队列 RabbitMQ
-
-- DBProxy
-  - 将数据层抽象，与具体的数据库实现解耦
-  - MySQL
-  - Redis
-
-#### 项目清单
-- 功能列表
-  - 文件上传服务
-    - 文件下载
-    - 秒传功能 / 断点续传
-  - 文件转移服务
-    - Go结合RabbitMQ消息队列实现文件异步存储到OSS
-  - 账号系统
-
-- 技术栈列表
-  - Go
-  - Gin
-  - MySQL
-  - Redis
-  - Docker
-  - RabbitMQ
-  - go-micro
-  - gPRC
-  - Kubernetes
+- React (TODO)
+  - 前端界面很丑，我得用 React Ant Design 美化一下
