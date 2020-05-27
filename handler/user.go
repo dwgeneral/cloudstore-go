@@ -4,64 +4,68 @@ import (
 	"cloudstore-go/db"
 	"cloudstore-go/util"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 const salt = "less is more !"
 
-// SignupHandler  用户注册处理
-func SignupHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		data, err := ioutil.ReadFile("./static/view/signup.html")
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Write(data)
-		return
-	}
-
-	r.ParseForm()
-	username := r.Form.Get("username")
-	passwd := r.Form.Get("password")
+// DoSignupHandler 用户注册POST处理
+func DoSignupHandler(c *gin.Context) {
+	username := c.Request.FormValue("username")
+	passwd := c.Request.FormValue("password")
 
 	if len(username) < 3 || len(passwd) < 3 {
-		w.Write([]byte("invalid parameters"))
+		c.JSON(http.StatusOK, gin.H{
+			"msg":  "invalid params",
+			"code": -1,
+		})
 		return
 	}
 	encodePasswd := util.Sha1([]byte(passwd + salt))
 	result := db.UserSignUp(username, encodePasswd)
 	if result {
-		w.Write([]byte("success"))
+		c.JSON(http.StatusOK, gin.H{
+			"msg":  "success",
+			"code": 0,
+		})
 	} else {
-		w.Write([]byte("failed"))
+		c.JSON(http.StatusOK, gin.H{
+			"msg":  "sign up failed",
+			"code": -2,
+		})
 	}
 }
 
-// SignInHandler 登陆处理
-func SignInHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		http.Redirect(w, r, "/static/view/signin.html", http.StatusFound)
-		return
-	}
+// SignupHandler  用户注册GET处理
+func SignupHandler(c *gin.Context) {
+	c.Redirect(http.StatusFound, "/static/view/signup.html")
+}
 
-	r.ParseForm()
-	username := r.Form.Get("username")
-	passwd := r.Form.Get("password")
+// DosignInHandler 用户登陆处理POST
+func DosignInHandler(c *gin.Context) {
+	username := c.Request.FormValue("username")
+	passwd := c.Request.FormValue("password")
 
 	encodePasswd := util.Sha1([]byte(passwd + salt))
 
 	pwdChecked := db.UserSignIn(username, encodePasswd)
 	if !pwdChecked {
-		w.Write([]byte("FAILED"))
+		c.JSON(http.StatusOK, gin.H{
+			"msg":  "login failed",
+			"code": -1,
+		})
 		return
 	}
 	token := GenToken(username)
 	res := db.UpdateToken(username, token)
 	if !res {
-		w.Write([]byte("failed"))
+		c.JSON(http.StatusOK, gin.H{
+			"msg":  "update token failed when sign in",
+			"code": -2,
+		})
 		return
 	}
 	resp := util.RespMsg{
@@ -72,12 +76,17 @@ func SignInHandler(w http.ResponseWriter, r *http.Request) {
 			Username string
 			Token    string
 		}{
-			Location: "http://" + r.Host + "/static/view/home.html",
+			Location: "/static/view/home.html",
 			Username: username,
 			Token:    token,
 		},
 	}
-	w.Write(resp.JSONBytes())
+	c.Data(http.StatusOK, "application/json", resp.JSONBytes())
+}
+
+// SignInHandler 登陆处理GET
+func SignInHandler(c *gin.Context) {
+	c.Redirect(http.StatusFound, "/static/view/signin.html")
 }
 
 // UserInfoHandler 查询用户信息

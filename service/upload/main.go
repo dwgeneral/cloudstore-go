@@ -23,8 +23,7 @@ func main() {
 	http.HandleFunc("/file/mpupload/uppart", handler.HTTPInterceptor(handler.UploadPartHandler))
 	http.HandleFunc("/file/mpupload/complete", handler.HTTPInterceptor(handler.CompleteUploadHandler))
 
-	http.HandleFunc("/user/signup", handler.SignupHandler)
-	http.HandleFunc("/user/signin", handler.SignInHandler)
+	
 	http.HandleFunc("/user/info", handler.HTTPInterceptor(handler.UserInfoHandler))
 
 	fmt.Println("upload service started on http://localhost:8080")
